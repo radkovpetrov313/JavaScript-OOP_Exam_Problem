@@ -23,6 +23,11 @@ function solve(){
 		return result;
 	}
 
+	function isItem (item) {
+		var validateItem = (item.id != undefined && item.description != undefined && item.name != undefined);
+		return (item instanceof book || item instanceof media || validateItem);
+	}
+
 	var item = (function(){
 		var itemId = 0,
 			item = Object.defineProperties({}, {
@@ -122,7 +127,7 @@ function solve(){
 	var media = (function(parent){
 		var media = Object.create(parent);
 
-		Object.defineProperty(media, 'init' {
+		Object.defineProperty(media, 'init', {
 			value: function (name, rating, duration, description) {
 				parent.init.call(this, name, description);
 
@@ -139,7 +144,7 @@ function solve(){
 					return this._name;
 				}, 
 				set: function (value) {
-					if (!isValidValue(value)) {
+					if (!isValidValue(value, 'string', 2, 40)) {
 						throw {
 							name: 'BookNameError',
 							message: 'Name must be string with length between 2 and 40 inclusive!'
@@ -198,6 +203,132 @@ function solve(){
 
 		return media;
 	}(item));
+
+	var catalog = (function(){
+		var catalogID = 0,
+			catalog = Object.defineProperty({}, 'init', {
+				value: function (name) {
+					this.name = name;
+					this.id = (catalogID += 1);
+					this.items = [];
+
+					return this;
+				}
+			});
+
+			Object.defineProperties(catalog, {
+				'name': {
+					get: function () {
+						return this._name;
+					},
+					set: function (value) {
+						if (!isValidValue(value, 'string', 2, 40)) {
+							throw {
+								name: 'CatalogNameError',
+								message: 'Name must be string with length between 2 and 40 inclusive!'
+							}
+						}
+					}
+				}, 
+				'add': {
+					value: function () {
+						var args = [].slice.apply(arguments),
+						result = [];
+
+						if (!args.length) {
+							throw {
+								name: 'CatalogAddError',
+								message: 'No items are passed to catalog.add()!'
+							}
+						}
+				
+						args.forEach(function (element) {
+							if (Array.isArray(element)) {
+								if (!element.length) {
+									throw {
+										name: 'CatalogAddError',
+										message: 'An empty array was passed to catalog.add()!'
+									}
+								}
+								
+								element.forEach(function (member) {
+									if (!isItem(member)) {
+										throw {
+											name: 'CatalogAddError',
+											message: 'Invalid item was passed to catalog.add()'
+										}
+									}
+
+									result.push(member);								
+								});
+							} else {
+								if (!isItem(element)) {
+									throw {
+										name: 'CatalogAddError',
+										message: 'Invalid item was passed to catalog.add()'
+									}
+								}
+
+								result.push(element);
+							}
+						});
+
+						if (result.length != 0) {
+							this.items = (this.items).concat(result);
+						}
+
+						return this;
+					}
+				},
+				'find': {
+					value: function (val) {
+						var result,
+							self = this;
+						
+						if (typeof(val) === 'number') {
+
+							result = this.items.find(function(element) {
+								return element.id === val;
+							});
+
+							if (result === undefined) {
+								return null;
+							} else {
+								return result;
+							}
+						} else {
+							var props = Object.keys(val),
+							    matchCriteria;
+
+							result = self.items.filter(function (element) {
+								matchCriteria = true;
+								
+								props.forEach(function (prop) {
+									if (prop === 'name') {
+										if (element[prop].toLowerCase() != val[prop].toLowerCase()) {
+											matchCriteria = false;
+										}
+									} else {
+										if (element[prop] != val[prop]) {
+											matchCriteria = false;
+										}
+									}
+								});
+
+								return matchCriteria;			
+							});
+
+							return result;
+						}
+					}
+				},
+				'search': {
+					value: function (pattern) {
+						
+					}
+				}
+			});
+	}());
 
 	return {
 		getBook: function (name, isbn, genre, description) {
