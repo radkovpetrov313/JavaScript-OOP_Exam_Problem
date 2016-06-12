@@ -1,4 +1,27 @@
 function solve(){ 
+	if (!Array.prototype.find) {
+  		Array.prototype.find = function(predicate) {
+		    if (this === null) {
+		      throw new TypeError('Array.prototype.find called on null or undefined');
+		    }
+		    if (typeof predicate !== 'function') {
+		      throw new TypeError('predicate must be a function');
+		    }
+		    var list = Object(this);
+		    var length = list.length >>> 0;
+		    var thisArg = arguments[1];
+		    var value;
+
+		    for (var i = 0; i < length; i++) {
+		      value = list[i];
+		      if (predicate.call(thisArg, value, i, list)) {
+		        return value;
+		      }
+		    }
+		    return undefined;
+	  };
+	}
+
 	function isValidDescription (des) {
 		return (typeof(des) === 'string' && des != '');
 	}
@@ -24,8 +47,18 @@ function solve(){
 	}
 
 	function isItem (item) {
-		var validateItem = (item.id != undefined && item.description != undefined && item.name != undefined);
-		return (item instanceof book || item instanceof media || validateItem);
+		var itemLikeObj = (item.id != undefined && item.description != undefined && item.name != undefined);
+		return (item.__proto__ === book || item.__proto__ === media || itemLikeObj);
+	}
+
+	function isBookLikeObj (item) {
+		return (isvalidIsbn(item.isbn) && typeof(item.genre) === 'string' && item.genre.length >= 2 && item.genre.length <= 20);
+	}
+
+	function isInside (arr, val) {
+		return arr.some(function(element) {
+			return element === val;
+		});
 	}
 
 	var item = (function(){
@@ -54,7 +87,8 @@ function solve(){
 				parent.init.call(this, name, description);
 
 				this.isbn = isbn;
-				this.description = description;
+				//this.description = description;
+				this.genre = genre;
 
 				return this;
 			}
@@ -81,12 +115,15 @@ function solve(){
 					return this._description;
 				},
 				set: function (value) {
+					
 					if (!isValidDescription(value)) {
 						throw {
 							name: 'BookDescriptionError',
 							message: 'Description must be a non-empty string!'
 						};
 					}
+
+					this._description = value;
 				}
 			},
 			isbn: {
@@ -235,39 +272,39 @@ function solve(){
 						var args = [].slice.apply(arguments),
 						result = [];
 
-						if (!args.length) {
+						/*if (!args.length) {
 							throw {
 								name: 'CatalogAddError',
 								message: 'No items are passed to catalog.add()!'
 							}
-						}
+						}*/
 				
 						args.forEach(function (element) {
 							if (Array.isArray(element)) {
-								if (!element.length) {
+								/*if (!element.length) {
 									throw {
 										name: 'CatalogAddError',
 										message: 'An empty array was passed to catalog.add()!'
 									}
-								}
+								}*/
 								
 								element.forEach(function (member) {
-									if (!isItem(member)) {
+									/*if (!isItem(member)) {
 										throw {
 											name: 'CatalogAddError',
 											message: 'Invalid item was passed to catalog.add()'
 										}
-									}
+									}*/
 
 									result.push(member);								
 								});
 							} else {
-								if (!isItem(element)) {
+								/*if (!isItem(element)) {
 									throw {
 										name: 'CatalogAddError',
 										message: 'Invalid item was passed to catalog.add()'
 									}
-								}
+								}*/
 
 								result.push(element);
 							}
@@ -324,11 +361,156 @@ function solve(){
 				},
 				'search': {
 					value: function (pattern) {
-						
+						var result;
+
+						if (typeof(pattern) != 'string' && pattern.length < 1) {
+							throw {
+								name: 'SearchError',
+								message: 'Search pattern must be a string with length atleast 1!'
+							};
+						}
+
+						pattern = pattern.toLowerCase();
+
+						result = this.items.filter(function(element) {
+							if ((element.name.toLowerCase()).indexOf(pattern) != -1 || (element.description.toLowerCase()).indexOf(pattern) != -1) {
+								return element;
+							}
+						});
+
+						return result;
 					}
 				}
 			});
+
+			return catalog;
 	}());
+
+	var bookCatalog = (function(parent){
+		var bookCatalog = Object.create(parent);
+
+		Object.defineProperty(bookCatalog, 'init', {
+			value: function(name) {
+				parent.init.call(this, name);
+
+				this.items = [];
+
+				return this;
+			}
+		});
+
+		Object.defineProperties(bookCatalog, {
+			'add':  {
+				value: function () {
+					var args = [].slice.apply(arguments),
+					result = [];
+
+					if (!args.length) {
+						throw {
+							name: 'bookCatalogAddError',
+							message: 'No items are passed to bookCatalog.add()!'
+						}
+					}
+			
+					args.forEach(function (element) {
+						if (Array.isArray(element)) {
+							if (!element.length) {
+								throw {
+									name: 'bookCatalogAddError',
+									message: 'An empty array was passed to bookCatalog.add()!'
+								}
+							}
+							
+							element.forEach(function (member) {
+								if (!isItem(member) || !isBookLikeObj(member)) {
+									throw {
+										name: 'bookCatalogAddError',
+										message: 'Invalid item was passed to bookCatalog.add()'
+									}
+								}
+
+								result.push(member);								
+							});
+						} else {
+							if (!isItem(element) /*|| !isBookLikeObj(element)*/) {
+								throw {
+									name: 'bookCatalogAddError',
+									message: 'Invalid item was passed to bookCatalog.add()'
+								}
+							}
+
+							result.push(element);
+						}
+					});
+
+					this.items = (this.items).concat(result);
+
+					return this;
+				}
+			},
+			'getGenres': {
+				value: function() {
+					var result = [],
+						self = this;
+
+					self.items.forEach(function(book) {	
+						if (!isInside(result, book.genre)) {
+							result.push((book.genre).toLowerCase());
+						}
+					});
+
+					return result;
+				}
+			},
+			'find': {
+				value: function(options) {
+					var result,
+						self = this;
+					if (typeof(options) === 'number') {
+						result = self.items.find(function(element) {
+							return element.id === options;
+						});
+
+						if (result === undefined) {
+							return null;
+						} else {
+							return result;
+						}
+					} else {
+						var props = Object.keys(options),
+							matchCriteria;
+
+						result = self.items.filter(function (element) {
+							matchCriteria = true;
+							
+							props.forEach(function (prop) {
+								if (prop === 'name' || prop === 'genre') {
+									if (element[prop].toLowerCase() != options[prop].toLowerCase()) {
+										matchCriteria = false;
+									}
+								} else {
+									if (element[prop] != options[prop]) {
+										matchCriteria = false;
+									}
+								}
+							});
+
+							return matchCriteria;			
+						});
+
+						return result;
+					}
+				}	
+			} 
+		});
+
+		return bookCatalog;
+
+	}(catalog));
+
+	/*var mediaCatalog = (function(){
+
+	}());*/
 
 	return {
 		getBook: function (name, isbn, genre, description) {
@@ -338,7 +520,7 @@ function solve(){
 		getMedia: function (name, rating, duration, description) {
 			//return a media instance
 			return Object.create(media).init(name, rating, duration, description);
-		}
+		},
 		getBookCatalog: function (name) {
 			//return a book catalog instance
 			return Object.create(bookCatalog).init(name);
@@ -358,6 +540,7 @@ var book2 = module.getBook('JavaScript: The Good Parts', '0123456789', 'IT', 'A 
 catalog.add(book1);
 catalog.add(book2);
 
+
 console.log(catalog.find(book1.id));
 //returns book1
 
@@ -370,5 +553,10 @@ console.log(catalog.search('js'));
 console.log(catalog.search('javascript'));
 //returns book1 and book2
 
-console.log(catalog.search('Te sa zeleni'))
+console.log(catalog.search('Te sa zeleni'));
 //returns []
+
+
+
+
+
