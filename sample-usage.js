@@ -33,7 +33,7 @@ function solve(){
 	function isvalidIsbn (isbn) {
 		var result = true;
 
-		if (typeof(isbn) != 'string' && (isbn.length != 10 && isbn.length != 13)) {
+		if (typeof(isbn) != 'string' || (isbn.length != 10 && isbn.length != 13)) {
 			result = false;
 		}
 
@@ -46,13 +46,17 @@ function solve(){
 		return result;
 	}
 
-	function isItem (item) {
-		var itemLikeObj = (item.id != undefined && item.description != undefined && item.name != undefined);
-		return (item.__proto__ === book || item.__proto__ === media || itemLikeObj);
+	function isItem (value) {
+		var itemLikeObj = (typeof(value.id) === 'number' && value.id > 0 && isValidDescription(value.description) && isValidValue(value.name, 'string', 2, 40));
+		return (/*value.__proto__ === item || */itemLikeObj);
 	}
 
-	function isBookLikeObj (item) {
-		return (isvalidIsbn(item.isbn) && typeof(item.genre) === 'string' && item.genre.length >= 2 && item.genre.length <= 20);
+	function isBook (value) {
+		return (value.__proto__ === book || (isvalidIsbn(value.isbn) && isValidValue(value.genre, 'string', 2, 20)));
+	}
+
+	function isMedia (value) {
+		return (value.__proto__ === media || (typeof(value.duration) === 'number' && value.duration > 0 && typeof(value.rating) === 'number' && value.rating >= 1 && value.rating <= 5));
 	}
 
 	function isInside (arr, val) {
@@ -75,6 +79,39 @@ function solve(){
 				}
 			});
 
+			Object.defineProperties(item, {
+				'name': {
+					get: function() {
+						return this._name;
+					},
+					set: function(value) {
+						if (!isValidValue(value, 'string', 2, 40)) {
+							throw {
+								name: 'BookNameError',
+								message: 'Name must be string with length between 2 and 40 inclusive!'
+							};
+						}
+
+						return this._name = value;
+					}
+				}, 
+				'description': {
+					get: function() {
+						return this._description;
+					},
+					set: function(value) {
+						if (!isValidDescription(value)) {
+							throw {
+								name: 'BookDescriptionError',
+								message: 'Description must be a non-empty string!'
+							};
+						}
+
+						this._description = value;
+					}
+				}
+			});
+
 		return item;
 	}());
 
@@ -87,7 +124,6 @@ function solve(){
 				parent.init.call(this, name, description);
 
 				this.isbn = isbn;
-				//this.description = description;
 				this.genre = genre;
 
 				return this;
@@ -95,38 +131,7 @@ function solve(){
 		});
 
 		Object.defineProperties(book, {
-			name: {
-				get: function () {
-					return this._name;
-				}, 
-				set: function (value) {
-					if (!isValidValue(value, 'string', 2, 40)) {
-						throw {
-							name: 'BookNameError',
-							message: 'Name must be string with length between 2 and 40 inclusive!'
-						};
-					}
-
-					return this._name = value;
-				}
-			},
-			description: {
-				get: function () {
-					return this._description;
-				},
-				set: function (value) {
-					
-					if (!isValidDescription(value)) {
-						throw {
-							name: 'BookDescriptionError',
-							message: 'Description must be a non-empty string!'
-						};
-					}
-
-					this._description = value;
-				}
-			},
-			isbn: {
+			'isbn': {
 				get: function () {
 					return this._isbn;
 				},
@@ -141,12 +146,12 @@ function solve(){
 					return this._isbn = value;
 				}
 			},
-			genre: {
+			'genre': {
 				get: function () {
 					return this._genre;
 				},
 				set: function (value) {
-					if (typeof(value) != 'string' || value.length < 2 || value.length > 20) {
+					if (!isValidValue(value, 'string', 2, 20)) {
 						throw {
 							name: 'BookGenreError',
 							message: 'Genre must be a string with length between 2 and 20 inclusive!'
@@ -175,35 +180,7 @@ function solve(){
 			}
 		});
 
-		Object.defineProperties(media, {
-			name: {
-				get: function () {
-					return this._name;
-				}, 
-				set: function (value) {
-					if (!isValidValue(value, 'string', 2, 40)) {
-						throw {
-							name: 'BookNameError',
-							message: 'Name must be string with length between 2 and 40 inclusive!'
-						};
-					}
-
-					return this._name = value;
-				}
-			},
-			description: {
-				get: function () {
-					return this._description;
-				},
-				set: function (value) {
-					if (!isValidDescription(value, 'string', 2, 40)) {
-						throw {
-							name: 'BookDescriptionError',
-							message: 'Description must be a non-empty string!'
-						};
-					}
-				}
-			},
+		Object.defineProperties(media, {	
 			duration: {
 				get: function () {
 					return this._duration;
@@ -226,7 +203,7 @@ function solve(){
 					return this._rating;
 				},
 				set: function (value) {
-					if (!isValidValue(value, 'number', 1, 5)) {
+					if (typeof(value) != 'number' || value < 1 || value > 5) {
 						throw {
 							name: 'MadiaRatingError',
 							message: 'Rating must be a number between 1 and 5 inclusive!'
@@ -272,39 +249,39 @@ function solve(){
 						var args = [].slice.apply(arguments),
 						result = [];
 
-						/*if (!args.length) {
+						if (!args.length) {
 							throw {
 								name: 'CatalogAddError',
 								message: 'No items are passed to catalog.add()!'
 							}
-						}*/
+						}
 				
 						args.forEach(function (element) {
 							if (Array.isArray(element)) {
-								/*if (!element.length) {
+								if (!element.length) {
 									throw {
 										name: 'CatalogAddError',
 										message: 'An empty array was passed to catalog.add()!'
 									}
-								}*/
+								}
 								
 								element.forEach(function (member) {
-									/*if (!isItem(member)) {
+									if (!isItem(member)) {
 										throw {
 											name: 'CatalogAddError',
 											message: 'Invalid item was passed to catalog.add()'
 										}
-									}*/
+									}
 
 									result.push(member);								
 								});
 							} else {
-								/*if (!isItem(element)) {
+								if (!isItem(element)) {
 									throw {
 										name: 'CatalogAddError',
 										message: 'Invalid item was passed to catalog.add()'
 									}
-								}*/
+								}
 
 								result.push(element);
 							}
@@ -402,50 +379,32 @@ function solve(){
 		Object.defineProperties(bookCatalog, {
 			'add':  {
 				value: function () {
-					var args = [].slice.apply(arguments),
-					result = [];
+					/*var args = [].slice.apply(arguments);
 
-					if (!args.length) {
-						throw {
-							name: 'bookCatalogAddError',
-							message: 'No items are passed to bookCatalog.add()!'
-						}
-					}
-			
-					args.forEach(function (element) {
-						if (Array.isArray(element)) {
-							if (!element.length) {
-								throw {
-									name: 'bookCatalogAddError',
-									message: 'An empty array was passed to bookCatalog.add()!'
-								}
-							}
+					args.forEach(function(bookElement) {
+						if (Array.isArray(bookElement)) {
 							
-							element.forEach(function (member) {
-								if (!isItem(member) || !isBookLikeObj(member)) {
+							bookElement.forEach(function(member) {
+								if (!isBook(member)) {
 									throw {
 										name: 'bookCatalogAddError',
-										message: 'Invalid item was passed to bookCatalog.add()'
-									}
+										message: 'Item passed to bookCatalog.add must be Book instance or Book-like object'
+									};
 								}
-
-								result.push(member);								
 							});
 						} else {
-							if (!isItem(element) /*|| !isBookLikeObj(element)*/) {
+							if (!isBook(bookElement)) {
 								throw {
 									name: 'bookCatalogAddError',
-									message: 'Invalid item was passed to bookCatalog.add()'
-								}
+									message: 'Item passed to bookCatalog.add must be Book instance or Book-like object'
+								};
 							}
-
-							result.push(element);
 						}
-					});
+					});*/
 
-					this.items = (this.items).concat(result);
+					parent.add.apply(this, arguments);
 
-					return this;
+					return this;					
 				}
 			},
 			'getGenres': {
@@ -508,9 +467,90 @@ function solve(){
 
 	}(catalog));
 
-	/*var mediaCatalog = (function(){
+	var mediaCatalog = (function(parent){
+		var mediaCatalog = Object.create(parent);
 
-	}());*/
+		Object.defineProperty(mediaCatalog, 'init', {
+			value: function(name) {
+				parent.init.call(this, name);
+
+				this.items = [];
+
+				return this;
+			}
+		});
+
+		Object.defineProperties(mediaCatalog, {
+			'add': {
+				value: function () {
+					/*var args = [].slice.apply(arguments);
+
+					args.forEach(function(mediaElement) {
+						if (Array.isArray(mediaElement)) {
+							
+							mediaElement.forEach(function(member) {
+								if (!isMedia(member)) {
+									throw {
+										name: 'mediaCatalogAddError',
+										message: 'Item passed to mediaCatalog.add must be Media instance or Media-like object'
+									};
+								}
+							});
+						} else {
+							if (!isMedia(mediaElement)) {
+								throw {
+									name: 'mediaCatalogAddError',
+									message: 'Item passed to bookCatalog.add must be Media instance or Media-like object'
+								};
+							}
+						}
+					});*/
+
+					parent.add.apply(this, arguments);
+
+					return this;
+				}
+			},
+			'getTop': {
+				value: function(count) {
+					if (typeof(count) != 'number' || count < 1) {
+						throw {
+							name: 'getTopError',
+							message: 'Count must be a number equal or bigger than 1'
+						};
+					}
+
+					var result = [];
+
+					result = this.items.sort(function(a, b) {
+									 	return b.rating - a.rating;
+								     })
+									 .filter(function(song, i, arr) {
+									 	return i < count;
+									 });
+
+					return result;
+				}
+			},
+			'getSortedByDuration': {
+				value: function() {
+					var self = this;
+
+					return self.items.sort(function(a, b) {
+										if (b.duration === a.duration) {
+											return a.id - b.id;
+										} else {
+											return b.duration - a.duration;
+										}
+									 });
+
+				}
+			}
+		});
+
+		return mediaCatalog;
+
+	}(catalog));
 
 	return {
 		getBook: function (name, isbn, genre, description) {
@@ -532,11 +572,42 @@ function solve(){
 	};
 }
 
+//mediaCatalog_TEST
 var module = solve();
+var mediaCat = module.getMediaCatalog('Peter\'s catalog');
+
+var song1 = module.getMedia('The Unforgiven', 5, 5, 'One of the best songs by Metallica');
+var song2 = module.getMedia('Mama Said', 2, 4, 'Other song by Metallica');
+var song3 = module.getMedia('Enter Sandman', 4, 6, 'Song from "Black Album"');
+var song4 = module.getMedia('Pour Twisted Me', 1, 3, 'This one is from "Load"');
+var song5 = module.getMedia('Until It Sleeps', 3, 4, 'This is from "Load" either');
+
+mediaCat.add(song1);
+mediaCat.add(song2);
+mediaCat.add(song3);
+mediaCat.add(song4);
+mediaCat.add(song5);
+
+console.log(mediaCat.getSortedByDuration());
+console.log();
+console.log();
+
+console.log(mediaCat.getTop(3));
+
+//--------------------------------------------------------------------------
+
+//bookCatalog_TEST
 var catalog = module.getBookCatalog('John\'s catalog');
 
-var book1 = module.getBook('The secrets of the JavaScript Ninja', '1234567890', 'IT', 'A book about JavaScript');
+var book1 = module.getBook('Just some book to test with', '1234567890', 'IT', 'Not so bad JavaScript Book');
 var book2 = module.getBook('JavaScript: The Good Parts', '0123456789', 'IT', 'A good book about JS');
+var bookMente = {
+	id: 15,
+	name: 'Am i the proper one',
+	description: 'Some book to test',
+	isbn: '1234567890',
+	genre: 'Horror'
+}
 catalog.add(book1);
 catalog.add(book2);
 
@@ -555,6 +626,39 @@ console.log(catalog.search('javascript'));
 
 console.log(catalog.search('Te sa zeleni'));
 //returns []
+console.log(catalog.items);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
